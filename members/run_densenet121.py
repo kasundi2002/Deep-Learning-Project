@@ -19,7 +19,8 @@ os.makedirs(RUNS_DIR, exist_ok=True)
 
 IMG_SIZE = 224
 BATCH_SIZE = 32
-EPOCHS = 20
+EPOCHS_PHASE1 = 1   # ✅ Frozen base: 1 epoch
+EPOCHS_PHASE2 = 2   # ✅ Fine-tune: 2 epochs
 SEED = 42
 
 # ===========================
@@ -68,7 +69,7 @@ NUM_CLASSES = train_generator.num_classes
 # ===========================
 base_model = DenseNet121(weights="imagenet", include_top=False,
                          input_shape=(IMG_SIZE, IMG_SIZE, 3))
-base_model.trainable = False  # freeze first
+base_model.trainable = False  # freeze first for Phase 1
 
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
@@ -107,18 +108,18 @@ callbacks = [
 ]
 
 # ===========================
-# Training Phase 1 (frozen base)
+# Phase 1 – Train frozen base (1 epoch)
 # ===========================
 history = model.fit(
     train_generator,
     validation_data=val_generator,
-    epochs=EPOCHS,
+    epochs=EPOCHS_PHASE1,
     class_weight=class_weights,
     callbacks=callbacks
 )
 
 # ===========================
-# Fine-tuning (unfreeze last 30 layers)
+# Phase 2 – Fine-tune last 30 layers (2 epochs)
 # ===========================
 for layer in base_model.layers[-30:]:
     layer.trainable = True
@@ -130,7 +131,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(1e-5),
 history_fine = model.fit(
     train_generator,
     validation_data=val_generator,
-    epochs=EPOCHS,
+    epochs=EPOCHS_PHASE2,
     class_weight=class_weights,
     callbacks=callbacks
 )
@@ -170,6 +171,6 @@ plt.figure(figsize=(10,5))
 plt.plot(history.history["accuracy"] + history_fine.history["accuracy"], label="Train Acc")
 plt.plot(history.history["val_accuracy"] + history_fine.history["val_accuracy"], label="Val Acc")
 plt.legend()
-plt.title("Training/Validation Accuracy")
+plt.title("Training/Validation Accuracy (Total 3 Epochs)")
 plt.savefig(os.path.join(RUNS_DIR, "training_curve.png"))
 plt.close()
